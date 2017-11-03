@@ -1,0 +1,47 @@
+{
+  "name": "pimatic-mihome",
+  "description": "mihome Plugin for pimatic",
+  "author": {
+    "name": "Dheeraj Khajuria",
+    "email": "Dheeraj.Khajuria@gmail.com"
+  },
+  "main": "mihome.coffee",
+  "files": [
+    "mihome.coffee",
+    "README.md",
+    "device-config-schema.coffee",
+    "mihome-config-schema.coffee",
+    "test-mihome.coffee",
+    "LICENSE"
+  ],
+  "version": "0.0.1",
+  "homepage": "",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:DheerajKhajuria/pimatic-mihome.git"
+  },
+  "license": "GPL-2.0",
+  "configSchema": "mihome-config-schema.coffee",
+  "keywords": [
+    "pimatic",
+    "mihome",
+    "mipurifier"
+  ],
+  "dependencies": {
+    "miio": "^0.13.0"
+  },
+  "engines": {
+    "node": ">0.8.x",
+    "npm": ">1.1.x"
+  },
+  "maintainers": [
+    {
+      "name": "dheerajkhajuria",
+      "email": "dheeraj.khajuria@gmail.com"
+    },
+    {
+      "name": "sweebee",
+      "email": "wiebenieuwenhuis@gmail.com"
+    }
+  ]
+}

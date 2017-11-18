@@ -26,7 +26,6 @@ module.exports = (env) ->
   #  
   #     someThing = require 'someThing'
   # 
-
   miio = require('miio')
   
   # ###MyPlugin class
@@ -44,7 +43,6 @@ module.exports = (env) ->
     #     
     # 
     init: (app, @framework, @config) =>
-     
       env.logger.info("Starting to miHome Plugin.")
 
       deviceConfigDef = require("./device-config-schema")
@@ -68,29 +66,151 @@ module.exports = (env) ->
             model = result.model
             autotoken = result.autotoken
             token = result.token
-            address = result.addres
+            address = result.address
 
             # Check if device already exists in pimatic
             newdevice = not @framework.deviceManager.devicesConfig.some (device, iterator) =>
-            device.type is type and device.model is model and device.autotoken is autotoken and device.token is token and device.address is address
+              device.type is type and device.model is model and device.autotoken is autotoken and device.token is token and device.address is address
 
-            # Device is a new device and not a battery device
-            if newdevice is true
-            # air purifier device found
-            if sensortype is AIR_PURIFIER
-              config = {
-                class: 'MySensorsDST',
-                type: type,
-                model: model,
-                autotoken: autotoken,
-                token: token,
-                address: address
-              }
-              @framework.deviceManager.discoveredDevice(
-                'pimatic-mihome', "Temp Sensor #{type}.#{address}", config
-              )
-            )
+            # Device is a new device 
+            if newdevice
+              # air purifier device found
+              if type is AIR_PURIFIER
+                config = {
+                  class: 'AirPurifier',
+                  type: type,
+                  model: model,
+                  autotoken: autotoken,
+                  token: token,
+                  address: address
+                }
+                @framework.deviceManager.discoveredDevice(
+                  'pimatic-mihome', "AirPurifier #{type}.#{model}.#{address}", config
+                )
+         )
       )
+
+      deviceClasses = [
+          AirPurifier
+        ]
+    
+      for Cl in deviceClasses
+        do (Cl) =>
+          @framework.deviceManager.registerDeviceClass(Cl.name, {
+            configDef: deviceConfigDef[Cl.name]
+            createCallback: (config,lastState) =>
+              device  =  new Cl(config,lastState)
+              return device
+            })    
+
+  # Device class representing the power switch of the Denon AVR
+  class AirPurifier extends env.devices.Device
+    # Create a new DenonAvrPowerSwitch device
+    # @param [Object] config    device configuration
+    # @param [DenonAvrPlugin] plugin   plugin instance
+    # @param [Object] lastState state information stored in database
+    constructor: (@config,lastState) ->
+      @id = @config.id
+      @name = @config.name
+      @properties = [
+        power:  lastState?.power?.value
+        mode: lastState?.mode?.value
+        favoriteLevel: lastState?.favoriteLevel?.value
+        temperature:  lastState?.temperature?.value
+        humidity:  lastState?.humidity?.value
+        aqi: lastState?.aqi?.value
+        bright:  lastState?.bright?.value
+        filterLifeRemaining:  lastState?.filterLifeRemaining?.value
+        filterHoursUsed:  lastState?.filterHoursUsed?.value
+        useTime:  lastState?.useTime?.value
+        led: lastState?.led?.value
+        ledBrightness:  lastState?.ledBrightness?.value
+        buzzer:  lastState?.buzzer?.value
+      ]
+    
+      @attributes = {}
+
+      @attributes.aqi = {
+        description: "Air Quality Index (PM 2.5)"
+        type: "number"
+        unit: ''
+        acronym: 'aqi'
+      }
+
+      @attributes.temperature = {
+        description: "The measured temperature"
+        type: "number"
+        unit: '°C'
+        acronym: 'T'
+      }
+
+      @attributes.humidity = {
+        description: "The measured humidity"
+        type: "number"
+        unit: '%'
+        acronym: 'RH'
+      }
+
+      @attributes.filterLifeRemaining = {
+        description: "Filter life remaining"
+        type: "number"
+        unit: '%'
+        acronym: ''
+      }
+    
+      @attributes.filterHoursUsed = {
+        description: "Filter remaining days"
+        type: "number"
+        unit: 'days'
+        acronym: ''
+      }
+
+      @attributes.useTime = {
+        description: "Filter used hours"
+        type: "number"
+        unit: 'Hr'
+        acronym: ''
+      }
+
+
+      @device = new miio.device(
+       address: @config.address,
+       type: @config.type,
+       model: @config.model,
+       )
+
+      @device.then (device) => 
+       env.logger.info ("Connected to the device")
+       @deviceObj = device;
+       # env.logger.info(device)
+       for propertyName,value of device._properties
+        @valueEventHandler ({property: propertyName,value})
+       device.on 'propertyChanged',  @valueEventHandler
+
+      @valueEventHandler = ( (result) =>
+       env.logger.info(result)
+       switch result.property
+        when "useTime" 
+         @properties[result.property] = result.value / 3600
+        when "filterHoursUsed" 
+         @properties[result.property] = Math.round(145 - result.value / 24)
+        else
+         @properties[result.property] = result.value
+       @emit result.property, @properties[result.property]
+       )
+
+      super()
+
+    destroy: ->
+     @deviceObj.destroy();     
+     super()
+  
+    getAqi: -> Promise.resolve @properties.aqi
+    getTemperature: -> Promise.resolve @properties.temperatue
+    getHumidity: -> Promise.resolve @properties.humidity
+    getFilterLifeRemaining: -> Promise.resolve @properties.filterLifeRemaining
+    getFilterHoursUsed: -> Promise.resolve @properties.filterHoursUsed
+    getUseTime: -> Promise.resolve @properties.useTime 
 
   # ###Finally
   # Create a instance of my plugin
